@@ -1,0 +1,47 @@
+name: Build and Deploy Cydia Repo
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dpkg tools
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq dpkg-dev bzip2
+
+      - name: Generate Packages / Release / index.html
+        run: sh build-repo.sh
+
+      - name: Assemble site
+        run: |
+          mkdir site
+          cp -r Release Packages Packages.bz2 Packages.gz index.html debs site/
+          if [ -f CydiaIcon.png ]; then cp CydiaIcon.png site/; fi
+          rm -f site/debs/.gitkeep
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
